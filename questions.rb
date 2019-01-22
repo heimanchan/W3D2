@@ -66,6 +66,22 @@ class Question
 				id = ?
 		SQL
 	end
+
+	def author
+		raise "#{self} not in database" unless self.id
+		QuestionsDatabase.instance.execute(<<-SQL, self.user_id)
+			SELECT
+				*
+			FROM
+				questions
+			WHERE
+				user_id = ?
+		SQL
+	end
+
+	def replies
+		Reply.find_by_question_id(self.id)
+	end
 end
 
 #####################
@@ -83,6 +99,18 @@ class User
 			WHERE
 				fname = ? AND
 				lname = ?
+		SQL
+		data.map { |datum| User.new(datum)}
+	end
+	
+	def self.find_by_id(id)
+		data = QuestionsDatabase.instance.execute(<<-SQL, id)
+			SELECT 
+				*
+			FROM
+				users
+			WHERE
+				id = ?
 		SQL
 		data.map { |datum| User.new(datum)}
 	end
@@ -114,6 +142,14 @@ class User
 			WHERE
 				id = ?
 		SQL
+	end
+
+	def authored_questions
+		Question.find_by_author_id(self.id)
+	end
+
+	def authored_replies
+		Reply.find_by_user_id(self.id)
 	end
 end
 
@@ -214,12 +250,12 @@ class Reply
 			SELECT 
 				*
 			FROM
-				questions
+				replies
 			WHERE
 				question_id = ?
 		SQL
 		
-		data.map { |datum| User.new(datum)}
+		data.map { |datum| Reply.new(datum)}
 	end
 
 	def initialize(options)
@@ -252,4 +288,37 @@ class Reply
 				id = ?
 		SQL
 	end
+
+	def author
+		User.find_by_id(@user_id)
+	end
+
+	def question
+		Question.find_by_id(@question_id)
+	end
+
+	def parent_reply
+		data = QuestionsDatabase.instance.execute(<<-SQL)
+			SELECT 
+				*
+			FROM
+				replies
+			WHERE
+				id = #{@parent_id}
+		SQL
+		data.map { |datum| Reply.new(datum)}
+	end
+
+	def child_replies
+		data = QuestionsDatabase.instance.execute(<<-SQL)
+			SELECT 
+				*
+			FROM
+				replies
+			WHERE
+				parent_id = #{@id}
+		SQL
+		data.map { |datum| Reply.new(datum)}
+	end
+
 end
